@@ -116,27 +116,6 @@ setwd("fp")
 
 ---
 
-## Adding a New Dataset Type
-
-1. Create a new file:
-   `R/check_<type>.R`
-
-2. Define:
-```r
-check_<type> <- function(file_path, sheet_name) {
-  # return issues dataframe
-}
-```
-
-3. Add to `run_checks.R`:
-```r
-"new_type" = check_new_type(file_path, sheet_name)
-```
-
-4. Document in README.
-
----
-
 ## Status
 
 - ✅ Core validation functionality implemented
