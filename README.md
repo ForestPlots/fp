@@ -1,9 +1,14 @@
 # ForestPlots Upload Checker
 
-Validates Excel files against ForestPlots upload rules before submission.
-Returns a tidy data frame of issues — one row per problem, with the Excel
-row number, Tree ID, affected census and column, and a plain-English
-description of each issue.
+**Work in progress** - this repository is evolving into a broader set of tools 
+for working with ForestPlots data.
+
+At present, it focuses on **validating Excel upload files before submission.**
+
+The checker runs a suite of rules against an upload file and returns a tidy
+data frame of issues — one row per problem — including:Excel row number, 
+Tree identifier, Affected census (if applicable), Column name, and Plain-English 
+description of the issue.
 
 ---
 
