@@ -1,108 +1,150 @@
-# ForestPlots Upload Checker
+# ForestPlots Upload Checker (`fp`)
 
-**Work in progress** - this repository is evolving into a broader set of tools 
-for working with ForestPlots data.
+A lightweight R-based validation tool for ForestPlots Excel upload files.
 
-At present, it focuses on **validating Excel upload files before submission.**
-
-The checker runs a suite of rules against an upload file and returns a tidy
-data frame of issues — one row per problem — including:Excel row number, 
-Tree identifier, Affected census (if applicable), Column name, and Plain-English 
-description of the issue.
+This repository provides a suite of checks that help ensure data quality before submission. It detects formatting errors, missing values, and inconsistencies, and returns a structured report for easy review.
 
 ---
 
-## Project structure
+## Overview
+
+The checker runs a set of validation rules on an Excel file and produces a tidy data frame of issues. Each row corresponds to a single problem.
+
+Output includes:
+- Excel row number
+- Tree identifier (if applicable)
+- Census information
+- Column name
+- Plain-English description of the issue
+
+---
+
+## Main Function
+
+### `run_checks()`
+
+This is the primary entry point for the tool. It:
+- Loads the dataset
+- Selects the appropriate validation routine
+- Runs all checks
+- Returns a tidy data frame of issues
+
+---
+
+## Quick Start
+
+```r
+# Load the checker
+source("run_checks.R")
+
+# Run validation
+issues <- run_checks(
+  dataset_type = "new_multicensus",
+  file_path = "path/to/your/upload.xlsx",
+  sheet_name = "plot001"  # or sheet index (e.g. 1)
+)
+
+# View results
+issues
+nrow(issues)  # 0 = no issues found
+
+# Export to Excel
+run_checks(
+  dataset_type = "new_multicensus",
+  file_path = "path/to/your/upload.xlsx",
+  export_path = "path/to/output_issues.xlsx"
+)
+```
+
+---
+
+## Supported Dataset Types
+
+| dataset_type        | Description |
+|--------------------|-------------|
+| new_multicensus    | New plots with 2+ censuses |
+| new_single_census  | New plots with 1 census |
+| single_recensus    | Existing plots with 1 new census |
+
+---
+
+## Example Output
+
+```r
+# A tibble: 3 × 5
+excel_row TreeID census   column   issue
+12        T001   Census 2 DBH      Missing value
+15        T005   NA       PlotID   Invalid format
+22        T002   Census 1 Species  Unknown species code
+```
+
+---
+
+## Project Structure
 
 ```
 fp/
 ├── R/
-│   ├── constants.R               # Column definitions and valid-value sets
-│   ├── utils.R                   # Shared helpers (log_issue, is_valid_f2, …)
-│   ├── check_new_multicensus.R   # Checks for new-plot multi-census uploads
-│   ├── check_new_single_census.R # Checks for new-plot single census uploads
-│   └── check_single_recensus.R   # Checks for new single census uploads for existing plots
-├── run_checks.R                  # Entry point — source this file
+│   ├── constants.R
+│   ├── utils.R
+│   ├── check_new_multicensus.R
+│   ├── check_new_single_census.R
+│   └── check_single_recensus.R
+├── run_checks.R
 └── README.md
 ```
 
+- `run_checks.R`: Entry point
+- `R/check_*`: Individual validation modules
+- `utils.R`: Shared helper functions
+- `constants.R`: Valid values and definitions
+
 ---
 
-## Quick start
+## Installation
 
 ```r
-source("run_checks.R")
-
-issues <- run_checks(
-  dataset_type = "new_multicensus",
-  file_path    = "path/to/your/upload.xlsx",
-  sheet_name   = "sheet_name_or_index"  # e.g. "plot001" or 1
-)
-
-issues          # view in RStudio — zero rows means file passed all checks
-nrow(issues)
-
-# Export results to Excel for sharing with field teams
-run_checks(
-  "new_multicensus",
-  "path/to/your/upload.xlsx",
-  export_path = "path/to/your/upload_issues.xlsx"
-)
-```
-
----
-
-## Supported dataset types
-
-| `dataset_type`     | Description                                                                |
-|--------------------|------------------------------------------------------------------------|
-| `new_multicensus`  | New plots not existing in ForestPlots, containing two or more censuses |
-| `new_single_census`| New plots not existing in ForestPlots, containing one census           |
-| `single_recensus`  | Existing plots already uploaded to ForestPlots, containing one census  |
-
----
-
-## Output columns
-
-| Column      | Description                                          |
-|-------------|------------------------------------------------------|
-| `excel_row` | Row number in the Excel file (includes header rows)  |
-| `TreeID`    | Tree identifier from the file (blank for new plots)  |
-| `census`    | Affected census, e.g. `Census 2` (`NA` for structural checks) |
-| `column`    | Affected column name or position label               |
-| `issue`     | Plain-English description of the problem             |
-
----
-
-## Adding a new dataset type
-
-1. Create `R/check_<type>.R` with a top-level function
-   `check_<type>(file_path, sheet_name)` that returns the issues data frame.
-2. Add `source("R/check_<type>.R")` near the top of `run_checks.R`.
-3. Add a new case to the `switch()` call inside `run_checks()`:
-   ```r
-   new_type = check_new_type(file_path, sheet_name),
-   ```
-4. Document the new type in the table above.
-
----
-
-## Dependencies
-
-```r
+# Install dependencies
 install.packages(c("readxl", "dplyr", "stringr", "writexl"))
+
+# Clone the repository
+git clone https://github.com/ForestPlots/fp.git
+
+# Set working directory
+setwd("fp")
 ```
 
 ---
 
-## Toward a package
+## Adding a New Dataset Type
 
-This project is structured to make the transition to an R package
-straightforward when the time comes:
+1. Create a new file:
+   `R/check_<type>.R`
 
-- All logic lives in `R/` as plain functions with no side effects.
-- `run_checks.R` is the only file that calls `source()` and `library()`;
-  in a package these become `@import` / `Imports:` declarations.
-- Each `check_*` function is independently testable (no global state).
-- roxygen2-style `@param` / `@return` / `@examples` tags are already in place,
-  ready for `devtools::document()`.
+2. Define:
+```r
+check_<type> <- function(file_path, sheet_name) {
+  # return issues dataframe
+}
+```
+
+3. Add to `run_checks.R`:
+```r
+"new_type" = check_new_type(file_path, sheet_name)
+```
+
+4. Document in README.
+
+---
+
+## Status
+
+- ✅ Core validation functionality implemented
+- ✅ Modular check system
+- 🚧 Expansion into broader ForestPlots tools
+
+---
+
+## About
+
+"fp" stands for ForestPlots tools. This repository provides utilities for validating and working with ForestPlots datasets.
