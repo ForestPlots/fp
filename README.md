@@ -17,10 +17,12 @@ description of the issue.
 ```
 fp/
 ├── R/
-│   ├── constants.R              # Column definitions and valid-value sets
-│   ├── utils.R                  # Shared helpers (log_issue, is_valid_f2, …)
-│   └── check_new_multicensus.R  # Checks for new-plot multi-census uploads
-├── run_checks.R                 # Entry point — source this file
+│   ├── constants.R               # Column definitions and valid-value sets
+│   ├── utils.R                   # Shared helpers (log_issue, is_valid_f2, …)
+│   ├── check_new_multicensus.R   # Checks for new-plot multi-census uploads
+│   ├── check_new_single_census.R # Checks for new-plot single census uploads
+│   └── check_single_recensus.R   # Checks for new single census uploads for existing plots
+├── run_checks.R                  # Entry point — source this file
 └── README.md
 ```
 
@@ -52,30 +54,11 @@ run_checks(
 
 ## Supported dataset types
 
-| `dataset_type`    | Description                                                                     |
-|-------------------|---------------------------------------------------------------------------------|
-| `new_multicensus` | New plots with no existing ForestPlots ID, containing two or more census blocks |
-
----
-
-## Checks performed (`new_multicensus`)
-
-| # | Section | What is checked |
-|---|---------|-----------------|
-| 1 | Row 1 — header structure | A1 label; `Census No:` headers present, correctly positioned, and contain a 4-digit year |
-| 2 | Row 2 — column names | All 13 fixed columns and every per-census block column match expected names exactly |
-| 3 | Required fields | TreeID **blank**; Family, Species, Tag No, D, POM, Flag1, Flag2 not empty in active census blocks |
-| 4 | Stem Grouping | Value shared across ≥ 2 rows; T1 and Species consistent within each group; Flag1 contains `h` |
-| 5 | Flag1 — character rules | Only valid characters; `a` only with `n`/`h`; stems absent in prior census must have `n` |
-| 6 | Flag2 — validity | Blank when Flag1 blank; valid code when Flag1 alive |
-| 7 | Flag3 — validity | Empty when dead (Flag1 = 0); filled with 0–6 when alive |
-| 8 | Flag4 — validity | Empty when dead; valid code when alive; `≠ 0` when D0 ≠ D; `= 60` when POM changed |
-| 9 | LI / CI / CF | Values within allowed ranges (1–4, ordinal codes, 0–4 respectively) |
-| 10 | Flag5 / Height | Flag5 filled (1–6) when Height present; Flag5 empty when Height empty |
-| 11 | Vouchers | Code format (3 letters + 3 digits); code-species consistency; collected value 0/1; each code collected at most once |
-| 12 | Alive/dead consistency | Flag1 = 0 and Flag2 = 1 never in the same census; dead stems cannot become alive in later censuses |
-| 13 | Dead — subsequent blocks | Entire census block must be empty for all censuses after a stem's death |
-| 14 | Recruit — prior blocks | Entire census block must be empty for all censuses before a stem's first appearance (`n` in Flag1) |
+| `dataset_type`     | Description                                                                |
+|--------------------|------------------------------------------------------------------------|
+| `new_multicensus`  | New plots not existing in ForestPlots, containing two or more censuses |
+| `new_single_census`| New plots not existing in ForestPlots, containing one census           |
+| `single_recensus`  | Existing plots already uploaded to ForestPlots, containing one census  |
 
 ---
 

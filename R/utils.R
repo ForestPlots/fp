@@ -2,6 +2,13 @@
 # Shared helper functions used across all check modules.
 # Depends on: constants.R (F2_G1, F2_G2, F2_G3, CENSUS_COLS)
 
+# ── Shared helpers ────────────────────────────────────────────────────────────
+
+#' Return TRUE for each element that is NA or blank after trimming whitespace.
+#' @param x Any vector.
+#' @return Logical vector, same length as x.
+is_empty <- function(x) is.na(x) | trimws(as.character(x)) == ""
+
 # ── Issue accumulation ────────────────────────────────────────────────────────
 
 new_issues <- function() list()

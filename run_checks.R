@@ -1,12 +1,12 @@
 # run_checks.R
 # ============================================================
-# Check whether your dataset follows all the ForestPlot rules prior to upload.
+# Main entry point for ForestPlots upload validation.
 #
 # Usage:
 #   source("run_checks.R")
 #
 #   issues <- run_checks(
-#     dataset_type = "new_multicensus", # the other option is existing_single_census
+#     dataset_type = "new_multicensus",
 #     file_path    = "path/to/upload.xlsx",
 #     sheet_name   = "Sheet1"
 #   )
@@ -27,7 +27,8 @@ library(writexl)
 source("R/constants.R")
 source("R/utils.R")
 source("R/check_new_multicensus.R")
-source("R/check_existing_single_census.R")
+source("R/check_single_recensus.R")
+source("R/check_new_single_census.R")
 
 
 #' Validate a ForestPlots upload Excel file.
@@ -40,7 +41,9 @@ source("R/check_existing_single_census.R")
 #'   \describe{
 #'     \item{"new_multicensus"}{New plots (no existing ForestPlots ID)
 #'       with two or more census periods.}
-#'     \item{"existing_single_census"}{Existing plots with one new census,
+#'     \item{"new_single_census"}{New plots (no existing ForestPlots ID)
+#'       with a single census.}
+#'     \item{"single_recensus"}{Existing plots with one new census,
 #'       submitted via a filled field sheet.}
 #'   }
 #' @param file_path   Character. Path to the .xlsx file to validate.
@@ -56,35 +59,44 @@ source("R/check_existing_single_census.R")
 #' \dontrun{
 #' source("run_checks.R")
 #'
+#' # New plot — multiple censuses
 #' issues <- run_checks(
 #'   dataset_type = "new_multicensus",
 #'   file_path    = "data/my_upload.xlsx",
 #'   sheet_name   = "plot001"
 #' )
 #'
-#' issues
+#' # New plot — single census
+#' issues <- run_checks(
+#'   dataset_type = "new_single_census",
+#'   file_path    = "data/my_upload.xlsx",
+#'   sheet_name   = "Sheet1"
+#' )
+#'
+#' # Existing plot — field sheet with one new census
+#' issues <- run_checks(
+#'   dataset_type = "single_recensus",
+#'   file_path    = "data/field_sheet.xlsx",
+#'   sheet_name   = "Field Sheet"
+#' )
+#'
+#' issues  # view in RStudio
 #'
 #' # Export to Excel for sharing with field teams
 #' run_checks(
 #'   "new_multicensus", "data/my_upload.xlsx",
 #'   export_path = "data/my_upload_issues.xlsx"
 #' )
-#'
-#' # Existing plot — field sheet with one new census
-#' issues <- run_checks(
-#'   dataset_type = "existing_single_census",
-#'   file_path    = "data/field_sheet.xlsx",
-#'   sheet_name   = "Field Sheet"
-#' )
 #' }
 run_checks <- function(dataset_type, file_path, sheet_name = 1, export_path = NULL) {
 
   result <- switch(
     dataset_type,
-    new_multicensus      = check_new_multicensus(file_path, sheet_name),
-    existing_single_census  = check_existing_single_census(file_path, sheet_name),
+    new_multicensus     = check_new_multicensus(file_path, sheet_name),
+    new_single_census   = check_new_single_census(file_path, sheet_name),
+    single_recensus = check_single_recensus(file_path, sheet_name),
     stop("Unknown dataset_type: '", dataset_type, "'. ",
-         "Supported types: 'new_multicensus', 'existing_single_census'")
+         "Supported types: 'new_multicensus', 'new_single_census', 'single_recensus'")
   )
 
   if (nrow(result) == 0) {
