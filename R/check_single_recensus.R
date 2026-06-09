@@ -1,4 +1,4 @@
-# R/check_existing_one_census.R
+# R/check_single_recensus.R
 # Validation checks for existing-plot field sheets with one new census.
 #
 # File format:
