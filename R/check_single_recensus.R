@@ -540,7 +540,7 @@ check_pom_change <- function(data, ref_pom) {
 #' @param sheet_name Sheet name or index (default: 1).
 #' @return A data frame with one row per issue, sorted by excel_row.
 #'   Zero rows means the file passed all checks.
-check_existing_one_census <- function(file_path, sheet_name = 1) {
+check_single_recensus <- function(file_path, sheet_name = 1) {
 
   # Parse data and capture layout metadata
   parsed     <- parse_existing_data(file_path, sheet_name)
