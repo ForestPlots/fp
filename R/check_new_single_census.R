@@ -34,7 +34,7 @@
 
 # All columns that must be present and non-empty
 REQUIRED_COLS_SC <- c(
-  "Tag No", "Family", "Species", "original identification",
+  "New Tag No", "Family", "Species", "original identification",
   "D", "POM", "Flag1", "Flag2", "Flag3", "Flag4"
 )
 
@@ -51,7 +51,7 @@ REQUIRED_COLS_SC <- c(
 #' @return Named list: data (tibble), header_row (int), col_names (character).
 parse_new_single_census_data <- function(file_path, sheet_name) {
   raw        <- read_excel(file_path, sheet = sheet_name, col_names = FALSE)
-  header_row <- if ("Tag No" %in% as.character(raw[1, ])) 1L else 2L
+  header_row <- if ("New Tag No" %in% as.character(raw[1, ])) 1L else 2L
   message("Column names detected in row ", header_row, ".")
 
   col_names   <- as.character(raw[header_row, ])
@@ -97,7 +97,7 @@ check_required_fields_sc <- function(data, col_names, header_row) {
 
   for (col in intersect(REQUIRED_COLS_SC, names(data))) {
     bad <- which(is_empty(data[[col]]))
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
       NA, col, paste0(col, " must not be empty"))
   }
 
@@ -110,13 +110,13 @@ check_required_fields_sc <- function(data, col_names, header_row) {
 #' @return List of issue tibbles.
 check_tag_no_uniqueness <- function(data) {
   issues   <- new_issues()
-  tag      <- trimws(as.character(data$`Tag No`))
+  tag      <- trimws(as.character(data$`New Tag No`))
   dup_tags <- tag[duplicated(tag) & !is.na(tag)]
   bad      <- which(tag %in% dup_tags)
 
-  log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
-    NA, "Tag No",
-    "Tag No is duplicated — must be unique across all rows")
+  log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
+    NA, "New Tag No",
+    "New Tag No is duplicated — must be unique across all rows")
 }
 
 #' Check that D, POM, Height, and Height Broken At are numeric when filled.
@@ -131,7 +131,7 @@ check_numeric_fields_sc <- function(data) {
     raw_val <- data[[col]]
     num_val <- suppressWarnings(as.numeric(as.character(raw_val)))
     bad     <- which(!is_empty(raw_val) & is.na(num_val))
-    issues  <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues  <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
       NA, col, paste0(col, " must be numeric"))
   }
 
@@ -155,26 +155,26 @@ check_flag1_sc <- function(data) {
 
   # Valid character set: 0, a–q, s, w–z
   bad <- which(has_f1 & !grepl(FLAG1_VALID_CHARS, f1))
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
     NA, "Flag1",
     "Flag1 contains invalid character(s) \u2014 allowed: 0, a\u2013q, s, w\u2013z")
 
   # "0" must appear alone — dead stems cannot carry additional flags
   bad <- which(has_f1 & grepl("0", f1, fixed = TRUE) & nchar(f1) > 1)
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
     NA, "Flag1",
     "Flag1: '0' must appear alone \u2014 dead stems must not combine '0' with other characters")
 
   # No duplicate characters
   has_dups <- nchar(f1) != nchar(gsub("(.)(?=.*\\1)", "", f1, perl = TRUE))
   bad <- which(has_f1 & has_dups)
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
     NA, "Flag1", "Flag1 contains duplicate characters")
 
   # 'a' may only be combined with 'n' and/or 'h'
   has_a <- has_f1 & grepl("a", f1, fixed = TRUE)
   bad   <- which(has_a & !f1 %in% FLAG1_A_VALID)
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
     NA, "Flag1",
     "Flag1: 'a' may only be combined with 'n' and/or 'h'")
 
@@ -195,7 +195,7 @@ check_flag2_sc <- function(data) {
   f1_alive <- has_f1 & f1 != "0"
 
   bad <- which(f1_alive & !is_valid_f2(f2))
-  log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
     NA, "Flag2",
     paste0("Flag2 is invalid \u2014 must be '1' alone or at most one character from each group: ",
            "[abcdefghiklm] / [pqr] / [jnostuvwxyz234567]"))
@@ -218,11 +218,11 @@ check_flag3_flag4_sc <- function(data) {
   if ("Flag3" %in% names(data)) {
     f3  <- trimws(as.character(data$Flag3))
     bad <- which(dead_or_absent & !is_empty(data$Flag3))
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
       NA, "Flag3", "Flag3 must be empty when Flag1 is missing or '0'")
 
     bad <- which(alive & !f3 %in% F3_VALID)
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
       NA, "Flag3",
       paste0("Flag3 invalid value \u2014 must be one of: ", paste(F3_VALID, collapse = ", ")))
   }
@@ -230,11 +230,11 @@ check_flag3_flag4_sc <- function(data) {
   if ("Flag4" %in% names(data)) {
     f4  <- trimws(as.character(data$Flag4))
     bad <- which(dead_or_absent & !is_empty(data$Flag4))
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
       NA, "Flag4", "Flag4 must be empty when Flag1 is missing or '0'")
 
     bad <- which(alive & !f4 %in% F4_VALID)
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
       NA, "Flag4",
       paste0("Flag4 invalid value \u2014 must be one of: ", paste(F4_VALID, collapse = ", ")))
   }
@@ -258,11 +258,11 @@ check_d_pom_dead_sc <- function(data) {
   pom <- suppressWarnings(as.numeric(as.character(data$POM)))
 
   bad <- which(f1 == "0" & !is.na(d) & d != 0)
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
     NA, "D", "Flag1 = '0' (dead) \u2014 D must equal 0")
 
   bad <- which(f1 == "0" & !is.na(pom) & pom != 0)
-  log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
     NA, "POM", "Flag1 = '0' (dead) \u2014 POM must equal 0")
 }
 
@@ -282,7 +282,7 @@ check_li_ci_cf_sc <- function(data) {
     li  <- trimws(as.character(data$LI))
     # Valid range 0–4 (0 included — differs from check_new_multicensus / check_existing_one_census)
     bad <- which(!is_empty(data$LI) & !li %in% c("0", "1", "2", "3", "4"))
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
       NA, "LI",
       "LI invalid value \u2014 must be empty or one of: 0, 1, 2, 3, 4")
   }
@@ -290,7 +290,7 @@ check_li_ci_cf_sc <- function(data) {
   if ("CI" %in% names(data)) {
     ci  <- trimws(as.character(data$CI))
     bad <- which(!is_empty(data$CI) & !ci %in% CI_VALID)
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
       NA, "CI",
       paste0("CI invalid value \u2014 must be empty or one of: ",
              paste(CI_VALID, collapse = ", ")))
@@ -299,7 +299,7 @@ check_li_ci_cf_sc <- function(data) {
   if ("CF" %in% names(data)) {
     cf  <- trimws(as.character(data$CF))
     bad <- which(!is_empty(data$CF) & !cf %in% c("0", "1", "2", "3", "4"))
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
       NA, "CF",
       "CF invalid value \u2014 must be empty or one of: 0, 1, 2, 3, 4")
   }
@@ -325,17 +325,17 @@ check_height_flag5_sc <- function(data) {
   has_f5     <- !is_empty(data$Flag5)
 
   bad <- which(has_height & !has_f5)
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
     NA, "Flag5",
     "Flag5 must be filled (1\u20136) when Height is present")
 
   bad <- which(has_height & has_f5 & !f5 %in% as.character(1:6))
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
     NA, "Flag5",
     "Flag5 invalid value \u2014 must be 1, 2, 3, 4, 5, or 6")
 
   bad <- which(!has_height & has_f5)
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
     NA, "Flag5",
     "Flag5 is filled but Height is empty \u2014 clear Flag5 or add a Height value")
 
@@ -359,7 +359,7 @@ check_vouchers_sc <- function(data) {
 
   # Format: 3 letters + 3 digits, no dashes or spaces
   bad <- which(has_vc & !grepl("^[A-Za-z]{3}[0-9]{3}$", vc))
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
     NA, "voucher code",
     "Voucher code invalid format \u2014 must be 3 letters + 3 digits, no dashes (e.g. ABC123)")
 
@@ -369,13 +369,13 @@ check_vouchers_sc <- function(data) {
 
     # voucher collected requires a voucher code
     bad <- which(!has_vc & has_vcl)
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
       NA, "voucher collected",
       "voucher collected is filled but voucher code is empty")
 
     # Must be 0 or 1
     bad <- which(has_vc & has_vcl & !vcl %in% c("0", "1"))
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
       NA, "voucher collected",
       "voucher collected invalid value \u2014 must be 0 or 1")
 
@@ -387,7 +387,7 @@ check_vouchers_sc <- function(data) {
       pull(vc)
 
     bad <- which(has_vc & vcl == "1" & vc %in% multi_collected)
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
       NA, "voucher collected",
       "voucher collected = 1 appears more than once for the same voucher code")
   }
@@ -402,7 +402,7 @@ check_vouchers_sc <- function(data) {
       pull(vc)
 
     bad <- which(has_vc & vc %in% multi_sp)
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
       NA, "voucher code",
       "Voucher code is linked to more than one Species \u2014 all rows with the same code must share the same Species")
   }
@@ -432,7 +432,7 @@ check_stem_grouping_sc <- function(data) {
   sg_counts <- table(sg_vals[sg_present])
   unique_sg <- names(sg_counts)[sg_counts == 1]
   bad <- which(sg_present & sg_vals %in% unique_sg)
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
     NA, "New stem grouping",
     "Stem grouping value appears only once \u2014 must be shared with at least one other row")
 
@@ -445,7 +445,7 @@ check_stem_grouping_sc <- function(data) {
       filter(t1_n > 1) |>
       pull(sg)
     bad <- which(sg_present & sg_vals %in% bad_t1)
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
       NA, "T1",
       "All rows in a Stem Grouping must share the same T1 value")
   }
@@ -459,14 +459,14 @@ check_stem_grouping_sc <- function(data) {
       filter(sp_n > 1) |>
       pull(sg)
     bad <- which(sg_present & sg_vals %in% bad_sp)
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
       NA, "Species",
       "All rows in a Stem Grouping must share the same Species")
   }
 
   # Flag1 must contain 'h' for every member of a group
   bad <- which(sg_present & !grepl("h", f1, fixed = TRUE))
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
     NA, "Flag1",
     "Flag1 must contain 'h' for all members of a Stem Grouping")
 
