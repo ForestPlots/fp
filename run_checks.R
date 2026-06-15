@@ -17,6 +17,18 @@
 #   # Export results to Excel
 #   run_checks("new_multicensus", "path/to/upload.xlsx",
 #              export_path = "validation_issues.xlsx")
+#
+#   # Plot stem X/Y locations coloured by subplot (T1 or T2)
+#   plot_stem_locations(
+#     dataset_type = "new_multicensus",
+#     file_path    = "path/to/upload.xlsx",
+#     sheet_name   = "Sheet1"
+#   )
+#
+#   plot_stem_locations("single_recensus", "path/to/file.xlsx",
+#                       subplot_col = "T2",
+#                       x_breaks = seq(0, 100, by = 10),
+#                       y_breaks = seq(0, 100, by = 10))
 # ============================================================
 
 library(readxl)
@@ -29,6 +41,7 @@ source("R/utils.R")
 source("R/check_new_multicensus.R")
 source("R/check_single_recensus.R")
 source("R/check_new_single_census.R")
+source("R/check_stem_locations.R")
 
 
 #' Validate a ForestPlots upload Excel file.
