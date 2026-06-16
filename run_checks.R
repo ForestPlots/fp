@@ -25,10 +25,18 @@
 #     sheet_name   = "Sheet1"
 #   )
 #
+#   # Coordinates recorded with the RAINFOR zig-zag protocol
 #   plot_stem_locations("single_recensus", "path/to/file.xlsx",
 #                       subplot_col = "T2",
-#                       x_breaks = seq(0, 100, by = 10),
-#                       y_breaks = seq(0, 100, by = 10))
+#                       coord_scale = "rainfor",
+#                       x_breaks    = seq(0, 100, by = 20),
+#                       y_breaks    = seq(0, 100, by = 20))
+#
+#   # Supported coord_scale values (default: "plot"):
+#   #   "plot"          — XY already in full-plot space
+#   #   "rainfor"       — RAINFOR zig-zag, column-by-column
+#   #   "rainfor-north" — subplot space, always facing north
+#   #   "rainfor-east"  — RAINFOR zig-zag, row-by-row
 # ============================================================
 
 library(readxl)
@@ -38,6 +46,7 @@ library(writexl)
 
 source("R/constants.R")
 source("R/utils.R")
+source("R/fill_coord.R")
 source("R/check_new_multicensus.R")
 source("R/check_single_recensus.R")
 source("R/check_new_single_census.R")

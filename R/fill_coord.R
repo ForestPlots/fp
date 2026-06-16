@@ -1,281 +1,184 @@
-# NOTE: this is currently not set up to work with any plot_stem_locations function
-# NEED TO ADD A WAY TO USE THE FILL_COORD.R FUNCTIONS IN THE CHECK STEM LOCATIONS SCRIPT; 
-# the default for this when used with plot_stem_locations should be plot level
-# if the funciton is at plot level and the XY range is under 20, then a warning should appear saying that the XY may be recorded at subplot level. 
-
-# -------------------------------------------------------------------------
-# fill_coord()
-# Converts subplot-level XY coordinates to full-plot XY depending on protocol.
+# R/fill_coord.R
+# Coordinate transformation for ForestPlots stem data.
 #
-# Supports three modes:
-#   - "rainfor"        : Coordinates recorded according to the direction the person faces
-#                       (zig-zag walking → orientation flips in even columns)
-#   - "rainfor-north"  : Coordinates recorded in subplot space with fixed orientation
-#   - "plot"           : Coordinates already in plot-level space
+# Converts subplot-level XY coordinates to full-plot XY coordinates,
+# or passes through coordinates already recorded at plot level.
 #
-# Also assigns artificial coordinates for missing stems on the west edge.
-# Only use with standard 5x5 rainfor-style 1-ha plots.
-# -------------------------------------------------------------------------
+# Only designed for standard 5 × 5 RAINFOR-style 1-ha plots (25 subplots of
+# 20 m × 20 m each). For "plot" mode, any plot shape is accepted.
+#
+# Depends on: data.table
 
-fill_coord <- 
-  function(fieldsheet, 
-           coord_scale = c("rainfor", "rainfor-north", "plot", "rainfor-east"), 
-           subplot = t1, 
-           id_tree = tree_id, 
-           x_stem = x, 
-           y_stem = y){
-    
-    
-    # ---------------------------------------------------------------------
-    # Validate coord_scale (forces: "rainfor", "subplot", or "plot")
-    # --------------------------------------------------------------
-    coord_scale <- match.arg(coord_scale)
-    
-    
-    # ---------------------------------------------------------------------
-    # Convert symbol arguments into column names (as strings)
-    # ---------------------------------------------------------------------
-    subplot <- deparse(substitute(subplot))
-    id_tree <- deparse(substitute(id_tree))
-    x_stem   <- deparse(substitute(x_stem))
-    y_stem   <- deparse(substitute(y_stem))
-    
-    # Ensure subplot column is numeric
-    fieldsheet[[subplot]] <- as.numeric(fieldsheet[[subplot]])
-    
-    
-    # =====================================================================
-    # =======================  rainfor MODE  ==============================
-    # =====================================================================
-    # Person moves serpentine through subplots → orientation flips.
-    # Columns 1,3,5 measured from lower-left; columns 2,4 measured from top-right.
-    # =====================================================================
-    if(coord_scale=="rainfor"){
-      
-      fieldsheet <- data.table::as.data.table(fieldsheet)
-      
-      # Constants
-      subplot_size <- 20L     # size of each subplot (m)
-      n_cols <- 5L
-      n_rows <- 5L
-      
-      # Extract local numeric vectors for convenience
-      subplot <- as.numeric(fieldsheet[[subplot]])
-      x_stem <- as.numeric(fieldsheet[[x_stem]])
-      y_stem <- as.numeric(fieldsheet[[y_stem]])
-      
-      
-      # ------------------------------------------------------------
-      # COLUMN INDEX: 1–5 block structure, NOT serpentine
-      # Used for horizontal orientation (odd = normal, even = flipped)
-      # ------------------------------------------------------------
-      col_idx <- ((subplot - 1L) %/% 5L) + 1L # 1..5
-      
-      
-      # ------------------------------------------------------------
-      # ROW & COLUMN INDEXES for serpentine Y grouping
-      # col_raw = raw 1–5 within row
-      # row_raw = row block 1–5
-      # row_idx = serpentine-adjusted "column" index per your layout
-      # ------------------------------------------------------------
-      col_raw <- ((subplot - 1L) %% n_cols) + 1L
-      row_raw <- ((subplot - 1L) %/% n_cols) + 1L
-      
-      # Flip column order for even-numbered rows (serpentine walk)
-      row_idx <- ifelse(
-        row_raw %% 2L == 0L,            # even rows
-        (n_cols + 1L) - col_raw,        # flip left ↔ right
-        col_raw             
-      )
-      
-      
-      # ------------------------------------------------------------
-      # X COORDINATE (orientation depends on column)
-      # odd columns  → measure from left edge
-      # even columns → measure from right edge
-      # ----------------------------------------------------------
-      is_even <- (col_idx %% 2L == 0L)
-      
-      # Left or right subplot boundarie
-      anchor_x <- ifelse(
-        is_even, 
-        col_idx * 20L,         # right boundary (40,
-        (col_idx - 1L) * 20L   # left boundary (0, 40, 80)
-      )
-      
-      # Final X coordinate: add or subtract depending on orien
-      x_plot <- ifelse(is_even, anchor_x - x_stem, anchor_x + x_stem)
-      
-      
-      # ------------------------------------------------------------
-      # Y COORDINATE (simple row offset; no orientation flip)
-      # row 1 → 0m, row 2 → 20m, ..., row 5 → 80m
-      # -----------------------------------------------------------
-      anchor_y <- ifelse(is_even, row_idx * 20L, (row_idx - 1L) * 20L)
-      y_plot <- ifelse(is_even, anchor_y - y_stem, anchor_y + y_stem)
-      
-      # Attach coordinates
-      fieldsheet[, x_plot := x_plot]
-      fieldsheet[, y_plot := y_plot]
-      
-    } 
-    
-    
-    # =====================================================================
-    # =======================  RAINFOR-EAST MODE  ==========================
-    # =====================================================================
-    # Layout: 5 × 5 grid of 20 m subplots
-    #
-    # Traversal pattern (serpentine by ROW):
-    #   - Row 1, 3, 5 → left → right
-    #   - Row 2, 4   → right → left
-    #   - Start at bottom-left, move across row, then snake upward
-    #
-    # Measurement origin:
-    #   - Orientation alternates with row direction
-    #   - Odd rows  → measured from lower-left corner
-    #   - Even rows → measured from upper-right corner
-    # =====================================================================
-    
-    if(coord_scale == "rainfor-east"){
-      
-      fieldsheet <- data.table::as.data.table(fieldsheet)
-      
-      # Constants
-      subplot_size <- 20L
-      n_cols <- 5L
-      n_rows <- 5L
-      
-      # Extract numeric vectors
-      subplot <- as.numeric(fieldsheet[[subplot]])
-      x_stem  <- as.numeric(fieldsheet[[x_stem]])
-      y_stem  <- as.numeric(fieldsheet[[y_stem]])
-      
-      # ------------------------------------------------------------
-      # RAW GRID POSITION (no serpentine yet)
-      # ------------------------------------------------------------
-      col_raw <- ((subplot - 1L) %% n_cols) + 1L   # 1..5 left→right
-      row_raw <- ((subplot - 1L) %/% n_cols) + 1L  # 1..5 bottom→top
-      
-      # ------------------------------------------------------------
-      # SERPENTINE COLUMN INDEX
-      # Flip column order for even-numbered rows
-      # ------------------------------------------------------------
-      col_idx <- ifelse(
-        row_raw %% 2L == 0L,            # even rows: right → left
-        (n_cols + 1L) - col_raw,
-        col_raw                         # odd rows: left → right
-      )
-      
-      # ------------------------------------------------------------
-      # ORIENTATION FLAG (based on row direction)
-      # odd rows  → normal (from lower-left)
-      # even rows → flipped (from upper-right)
-      # ------------------------------------------------------------
-      is_even_row <- (row_raw %% 2L == 0L)
-      
-      # ------------------------------------------------------------
-      # X COORDINATE
-      # ------------------------------------------------------------
-      anchor_x <- ifelse(
-        is_even_row,
-        col_idx * subplot_size,           # right boundary
-        (col_idx - 1L) * subplot_size     # left boundary
-      )
-      
-      x_plot <- ifelse(
-        is_even_row,
-        anchor_x - x_stem,                # measure from right
-        anchor_x + x_stem                 # measure from left
-      )
-      
-      # ------------------------------------------------------------
-      # Y COORDINATE
-      # ------------------------------------------------------------
-      anchor_y <- ifelse(
-        is_even_row,
-        row_raw * subplot_size,           # top boundary
-        (row_raw - 1L) * subplot_size     # bottom boundary
-      )
-      
-      y_plot <- ifelse(
-        is_even_row,
-        anchor_y - y_stem,                # measure from top
-        anchor_y + y_stem                 # measure from bottom
-      )
-      
-      # Attach coordinates
-      fieldsheet[, x_plot := x_plot]
-      fieldsheet[, y_plot := y_plot]
+library(data.table)
+
+#' Convert subplot XY coordinates to plot-level XY coordinates.
+#'
+#' Adds two new columns — \code{x_plot} and \code{y_plot} — representing stem
+#' positions in the full-plot coordinate system. Stems with missing XY receive
+#' artificial negative-X positions stacked on the west edge so they remain
+#' visible when mapped.
+#'
+#' @param data        A data frame (or data.table) of stem records.
+#' @param coord_scale Character. The recording convention used in the field.
+#'   \describe{
+#'     \item{"plot"}{(Default) Coordinates are already in plot-level space.
+#'       X and Y are copied to x_plot and y_plot unchanged.}
+#'     \item{"rainfor"}{Traditional RAINFOR zig-zag protocol: the measurer
+#'       walks column-by-column through subplots, so the measurement origin
+#'       flips in even-numbered subplot columns.}
+#'     \item{"rainfor-north"}{Coordinates recorded inside each subplot always
+#'       facing north (no zig-zag flip). Subplot offsets are added to place
+#'       stems in plot space.}
+#'     \item{"rainfor-east"}{Like "rainfor" but the serpentine walk runs
+#'       row-by-row (east/west) rather than column-by-column.}
+#'   }
+#' @param subplot_col Character. Name of the subplot column in \code{data}.
+#'   Default: \code{"T1"}.
+#' @param id_col      Character. Name of the stem identifier column. Used only
+#'   when assigning artificial coordinates to records with missing XY. Default:
+#'   \code{"Tag No"}.
+#' @param x_col       Character. Name of the raw X column. Default: \code{"X"}.
+#' @param y_col       Character. Name of the raw Y column. Default: \code{"Y"}.
+#'
+#' @return A data.table equal to \code{data} with \code{x_plot} and
+#'   \code{y_plot} columns appended.
+#'
+#' @examples
+#' \dontrun{
+#' source("run_checks.R")
+#'
+#' # Coordinates already at plot level (default)
+#' filled <- fill_coord(my_data)
+#'
+#' # Coordinates recorded with the RAINFOR zig-zag protocol
+#' filled <- fill_coord(my_data, coord_scale = "rainfor")
+#'
+#' # Use T2 as the subplot column
+#' filled <- fill_coord(my_data, coord_scale = "rainfor-north", subplot_col = "T2")
+#' }
+#' 
+fill_coord <- function(data,
+                       coord_scale = c("plot", "rainfor", "rainfor-north", "rainfor-east"),
+                       subplot_col = "T1",
+                       id_col      = "Tag No",
+                       x_col       = "X",
+                       y_col       = "Y") {
+
+  coord_scale <- match.arg(coord_scale)
+
+  missing_cols <- setdiff(c(subplot_col, id_col, x_col, y_col), names(data))
+  if (length(missing_cols) > 0) {
+    stop("Column(s) not found in data: ", paste(missing_cols, collapse = ", "))
+  }
+
+  dt           <- data.table::as.data.table(data)
+  subplot_size <- 20L
+  n_cols       <- 5L
+
+  dt[[subplot_col]] <- as.numeric(dt[[subplot_col]])
+
+  # ── plot ──────────────────────────────────────────────────────────────────
+  # Coordinates are already in full-plot space; copy directly.
+  if (coord_scale == "plot") {
+    dt[, x_plot := as.numeric(dt[[x_col]])]
+    dt[, y_plot := as.numeric(dt[[y_col]])]
+  }
+
+  # ── rainfor ───────────────────────────────────────────────────────────────
+  # Serpentine walk column-by-column.
+  # Odd columns measured from lower-left; even columns from upper-right.
+  if (coord_scale == "rainfor") {
+    sp_v <- dt[[subplot_col]]
+    x_v  <- as.numeric(dt[[x_col]])
+    y_v  <- as.numeric(dt[[y_col]])
+
+    col_idx <- ((sp_v - 1L) %/% 5L) + 1L
+    col_raw <- ((sp_v - 1L) %% n_cols) + 1L
+    row_raw <- ((sp_v - 1L) %/% n_cols) + 1L
+    # Flip column order on even rows to follow the serpentine walk
+    row_idx <- ifelse(row_raw %% 2L == 0L, (n_cols + 1L) - col_raw, col_raw)
+
+    is_even_col <- (col_idx %% 2L == 0L)
+
+    anchor_x <- ifelse(is_even_col, col_idx * subplot_size, (col_idx - 1L) * subplot_size)
+    anchor_y <- ifelse(is_even_col, row_idx * subplot_size, (row_idx - 1L) * subplot_size)
+
+    dt[, x_plot := ifelse(is_even_col, anchor_x - x_v, anchor_x + x_v)]
+    dt[, y_plot := ifelse(is_even_col, anchor_y - y_v, anchor_y + y_v)]
+  }
+
+  # ── rainfor-east ──────────────────────────────────────────────────────────
+  # Serpentine walk row-by-row (east/west).
+  # Odd rows measured from lower-left; even rows from upper-right.
+  if (coord_scale == "rainfor-east") {
+    sp_v <- dt[[subplot_col]]
+    x_v  <- as.numeric(dt[[x_col]])
+    y_v  <- as.numeric(dt[[y_col]])
+
+    col_raw <- ((sp_v - 1L) %% n_cols) + 1L
+    row_raw <- ((sp_v - 1L) %/% n_cols) + 1L
+    # Flip column order on even rows
+    col_idx <- ifelse(row_raw %% 2L == 0L, (n_cols + 1L) - col_raw, col_raw)
+
+    is_even_row <- (row_raw %% 2L == 0L)
+
+    anchor_x <- ifelse(is_even_row, col_idx * subplot_size, (col_idx - 1L) * subplot_size)
+    anchor_y <- ifelse(is_even_row, row_raw * subplot_size, (row_raw - 1L) * subplot_size)
+
+    dt[, x_plot := ifelse(is_even_row, anchor_x - x_v, anchor_x + x_v)]
+    dt[, y_plot := ifelse(is_even_row, anchor_y - y_v, anchor_y + y_v)]
+  }
+
+  # ── rainfor-north ─────────────────────────────────────────────────────────
+  # Always facing north; no orientation flip. Subplot column offset added to X;
+  # Y offset read from a lookup table that follows the serpentine row structure.
+  if (coord_scale == "rainfor-north") {
+    sp_v <- dt[[subplot_col]]
+    x_v  <- as.numeric(dt[[x_col]])
+    y_v  <- as.numeric(dt[[y_col]])
+
+    x_offset <- subplot_size * ((sp_v - 1L) %/% 5L)
+    dt[, x_plot := x_v + x_offset]
+
+    y_offsets <- c(
+       0, 20, 40, 60, 80,
+      80, 60, 40, 20,  0,
+       0, 20, 40, 60, 80,
+      80, 60, 40, 20,  0,
+       0, 20, 40, 60, 80
+    )
+
+    valid        <- !is.na(sp_v) & sp_v >= 1L & sp_v <= 25L
+    y_plot_vals  <- rep(NA_real_, nrow(dt))
+    y_plot_vals[valid] <- y_v[valid] + y_offsets[sp_v[valid]]
+    dt[, y_plot := y_plot_vals]
+  }
+
+  # ── Artificial coordinates for stems with missing XY ──────────────────────
+  # Stems where x_plot is still NA after transformation are placed at negative
+  # X positions west of the plot, stacked in groups of 50.
+  id_v      <- dt[[id_col]]
+  missing_x <- which(is.na(dt[["x_plot"]]))
+
+  if (length(missing_x) > 0) {
+    x_less <- sort(id_v[missing_x])
+    for (i in seq_along(x_less)) {
+      idx <- which(id_v == x_less[[i]])
+      dt[idx, x_plot := -10 - 5 * ceiling(i / 50)]
     }
-    
-    
-    # =====================================================================
-    # ========================== RAINFOR-NORTH ============================
-    # =====================================================================
-    # XY recorded inside subplot space but always facing north (no zig-zag)
-    # =====================================================================
-    if (coord_scale == "rainfor-north") {
-      
-      fieldsheet <- data.table::as.data.table(fieldsheet)
-      
-      # X offsets per block of 5 subplots
-      x_offset <- 20 * ((fieldsheet[[subplot]] - 1L) %/% 5L)
-      fieldsheet[, x_plot := fieldsheet[[x_stem]] + x_offset]
-      
-      # Predefined rainfor Y offsets for serpentine structur
-      y_offsets <- c(
-        0,20,40,60,80,
-        80,60,40,20,0,
-        0,20,40,60,80,
-        80,60,40,20,0,
-        0,20,40,60,80
-      )
-      
-      y_plot_vals <- fieldsheet[[y_stem]] + y_offsets[fieldsheet[[subplot]]]
-      
-      # Only valid for subplot 1–25
-      fieldsheet[
-        data.table::between(get(subplot), 1, 25), 
-        y_plot := y_plot_vals
-      ]
-      
-      fieldsheet[
-        !data.table::between(get(subplot), 1, 25), 
-        y_plot := NA_real_
-      ]
-    }
-    
-    
-    # =====================================================================
-    # ============================ PLOT MODE ===============================
-    # =====================================================================
-    # XY already recorded in global plot coordinates → copy as-is
-    # ==================================================================
-    if(coord_scale=="plot"){
-      fieldsheet[["x_plot"]] <- fieldsheet[[x_stem]]
-      fieldsheet[["y_plot"]] <- fieldsheet[[y_stem]]
-    }
-    
-    
-    # =====================================================================
-    # ========= ASSIGN ARTIFICIAL COORDINATES FOR MISSING XY ==============
-    # =====================================================================
-    # Trees with missing coordinates placed on west side of plot
-    # ====================================================================
-    
-    # X missing: stack them westwards in groups o
-    x_less <- sort(fieldsheet[is.na(x_plot)][[id_tree]])
-    for(i in seq_along(x_less)){
-      fieldsheet[get(id_tree)==x_less[i]][["x_plot"]] <- -10-5*ceiling(i/50)
-    };rm(i)
-    
-    # Y positions for these artificial X positio
-    for(i in sort(unique(fieldsheet[x_plot<0][["x_plot"]]), decreasing = TRUE)){
-      y_less <- fieldsheet[x_plot==i][[id_tree]]
-      for(j in seq_along(y_less)){
-        fieldsheet[get(id_tree)==y_less[j], y_plot := j * 2]
+
+    neg_x_positions <- sort(
+      unique(dt[["x_plot"]][!is.na(dt[["x_plot"]]) & dt[["x_plot"]] < 0]),
+      decreasing = TRUE
+    )
+    for (x_pos in neg_x_positions) {
+      ids_here <- id_v[!is.na(dt[["x_plot"]]) & dt[["x_plot"]] == x_pos]
+      for (j in seq_along(ids_here)) {
+        idx <- which(id_v == ids_here[[j]])
+        dt[idx, y_plot := j * 2L]
       }
     }
-    return(fieldsheet)
   }
+
+  dt
+}

@@ -1,23 +1,33 @@
 # R/check_stem_locations.R
 # Interactive stem-location map for ForestPlots upload files.
 #
-# Plots X/Y coordinates coloured by subplot (T1 or T2) for any of the three
-# supported dataset types, using the same header-detection logic as the
-# validation modules.
+# Loads X/Y coordinates from any of the three supported dataset types,
+# transforms them to plot-level space via fill_coord(), and produces an
+# interactive plotly scatter plot coloured by subplot.
 #
 # Usage (after sourcing run_checks.R):
 #
+#   # Coordinates already in plot space (default)
 #   plot_stem_locations(
 #     dataset_type = "new_multicensus",
 #     file_path    = "path/to/upload.xlsx",
 #     sheet_name   = "Sheet1"
 #   )
 #
-#   # Colour by T2 instead of T1
-#   plot_stem_locations("single_recensus", "path/to/file.xlsx",
-#                       subplot_col = "T2")
+#   # Coordinates recorded with the RAINFOR zig-zag protocol
+#   plot_stem_locations(
+#     dataset_type = "single_recensus",
+#     file_path    = "path/to/file.xlsx",
+#     coord_scale  = "rainfor"
+#   )
 #
-# Depends on: readxl, dplyr, ggplot2, plotly
+#   # Colour by T2, fixed axis breaks
+#   plot_stem_locations("new_multicensus", "path/to/upload.xlsx",
+#                       subplot_col = "T2",
+#                       x_breaks    = seq(0, 100, by = 10),
+#                       y_breaks    = seq(0, 100, by = 10))
+#
+# Depends on: readxl, dplyr, ggplot2, plotly, fill_coord.R
 
 library(readxl)
 library(dplyr)
@@ -37,22 +47,22 @@ LOCATION_PALETTE <- c(
 
 # ── Internal helper ───────────────────────────────────────────────────────────
 
-#' Load X/Y/subplot columns from a ForestPlots upload file.
+#' Load stem records from a ForestPlots upload file.
 #'
 #' Handles the header-row differences across the three dataset types:
-#'   - new_multicensus  : row 1 is the census-date filler row; column names
-#'                        are always in row 2.
-#'   - single_recensus  : column names are in row 1 or row 2, detected by the
-#'                        presence of "Tag No" or "New Tag No" in row 1.
-#'   - new_single_census: column names are in row 1 or row 2, detected by the
-#'                        presence of "Tag No" in row 1.
+#'   - new_multicensus  : row 1 is the census-date filler; column names always
+#'                        in row 2.
+#'   - single_recensus  : column names in row 1 or 2, detected by the presence
+#'                        of "Tag No" or "New Tag No" in row 1.
+#'   - new_single_census: column names in row 1 or 2, detected by the presence
+#'                        of "Tag No" in row 1.
 #'
 #' @param dataset_type One of "new_multicensus", "single_recensus",
 #'   "new_single_census".
 #' @param file_path   Path to the .xlsx file.
 #' @param sheet_name  Sheet name or index passed to readxl.
-#' @return A tibble with at minimum columns X, Y, excel_row, and whatever
-#'   columns were present in the file (including T1, T2, Tag No, etc.).
+#' @return A tibble containing all columns from the file plus an excel_row
+#'   column recording each stem's original row number in the workbook.
 load_location_data <- function(dataset_type, file_path, sheet_name) {
   raw <- read_excel(file_path, sheet = sheet_name, col_names = FALSE)
 
@@ -63,7 +73,7 @@ load_location_data <- function(dataset_type, file_path, sheet_name) {
       if (any(c("Tag No", "New Tag No") %in% as.character(raw[1, ]))) 1L else 2L
     },
     new_single_census = {
-      if (any(c("New Tag No", "Tag No") %in% as.character(raw[1, ]))) 1L else 2L
+      if (any(c("Tag No", "New Tag No") %in% as.character(raw[1, ]))) 1L else 2L
     },
     stop("Unknown dataset_type: '", dataset_type, "'. ",
          "Supported types: 'new_multicensus', 'new_single_census', 'single_recensus'.")
@@ -83,8 +93,10 @@ load_location_data <- function(dataset_type, file_path, sheet_name) {
 
 #' Plot stem X/Y locations for a ForestPlots upload file.
 #'
-#' Produces an interactive plotly scatter plot of stem coordinates coloured by
-#' subplot. Hover text shows the stem's Tag No and its excel row number.
+#' Loads stem records, transforms their coordinates to plot-level space using
+#' \code{\link{fill_coord}}, and produces an interactive plotly scatter plot
+#' coloured by subplot. Stems with missing XY coordinates are placed on the
+#' west edge of the plot (x < 0) rather than silently dropped.
 #'
 #' @param dataset_type Character. One of:
 #'   \describe{
@@ -94,12 +106,23 @@ load_location_data <- function(dataset_type, file_path, sheet_name) {
 #'   }
 #' @param file_path   Character. Path to the .xlsx file.
 #' @param sheet_name  Sheet name or index passed to readxl. Default: 1.
-#' @param subplot_col Character. Column to use for colour grouping. Must be
-#'   present in the file. Default: "T1".
-#' @param x_breaks    Numeric vector of x-axis gridline positions. If NULL
-#'   (default), breaks are chosen automatically with pretty().
-#' @param y_breaks    Numeric vector of y-axis gridline positions. If NULL
-#'   (default), breaks are chosen automatically with pretty().
+#' @param subplot_col Character. Column to use for colour grouping (e.g.
+#'   \code{"T1"} or \code{"T2"}). Must be present in the file. Default:
+#'   \code{"T1"}.
+#' @param coord_scale Character. The recording convention for the X/Y
+#'   coordinates in the file. Passed directly to \code{\link{fill_coord}}.
+#'   \describe{
+#'     \item{"plot"}{(Default) Already in full-plot space; no transformation.}
+#'     \item{"rainfor"}{RAINFOR zig-zag, column-by-column.}
+#'     \item{"rainfor-north"}{Subplot space, always facing north.}
+#'     \item{"rainfor-east"}{RAINFOR zig-zag, row-by-row.}
+#'   }
+#' @param x_breaks    Numeric vector of x-axis gridline positions. If
+#'   \code{NULL} (default), breaks are chosen automatically with
+#'   \code{pretty()}.
+#' @param y_breaks    Numeric vector of y-axis gridline positions. If
+#'   \code{NULL} (default), breaks are chosen automatically with
+#'   \code{pretty()}.
 #'
 #' @return A plotly htmlwidget (printed automatically when called
 #'   interactively).
@@ -108,33 +131,44 @@ load_location_data <- function(dataset_type, file_path, sheet_name) {
 #' \dontrun{
 #' source("run_checks.R")
 #'
-#' # New multi-census plot, colour by T1
+#' # Coordinates already in plot space (default)
 #' plot_stem_locations(
 #'   dataset_type = "new_multicensus",
 #'   file_path    = "data/my_upload.xlsx",
 #'   sheet_name   = "plot001"
 #' )
 #'
-#' # Existing-plot field sheet, colour by T2, fixed axis breaks
+#' # Coordinates from RAINFOR zig-zag field protocol, colour by T2
 #' plot_stem_locations(
 #'   dataset_type = "single_recensus",
 #'   file_path    = "data/field_sheet.xlsx",
 #'   sheet_name   = "Field Sheet",
 #'   subplot_col  = "T2",
-#'   x_breaks     = seq(0, 100, by = 10),
-#'   y_breaks     = seq(0, 100, by = 10)
+#'   coord_scale  = "rainfor"
+#' )
+#'
+#' # Fixed axis breaks for a standard 1-ha plot
+#' plot_stem_locations(
+#'   dataset_type = "new_single_census",
+#'   file_path    = "data/my_upload.xlsx",
+#'   coord_scale  = "rainfor-north",
+#'   x_breaks     = seq(0, 100, by = 20),
+#'   y_breaks     = seq(0, 100, by = 20)
 #' )
 #' }
 plot_stem_locations <- function(dataset_type,
                                 file_path,
                                 sheet_name  = 1,
                                 subplot_col = "T1",
+                                coord_scale = c("plot", "rainfor", "rainfor-north", "rainfor-east"),
                                 x_breaks    = NULL,
                                 y_breaks    = NULL) {
 
+  coord_scale <- match.arg(coord_scale)
+
   data <- load_location_data(dataset_type, file_path, sheet_name)
 
-  # Validate required columns
+  # Validate required columns before attempting transformation
   required <- c("X", "Y", subplot_col)
   missing  <- setdiff(required, names(data))
   if (length(missing) > 0) {
@@ -142,22 +176,56 @@ plot_stem_locations <- function(dataset_type,
          paste(missing, collapse = ", "))
   }
 
-  # Coerce coordinates to numeric
-  data <- data |>
-    mutate(
-      X = as.numeric(X),
-      Y = as.numeric(Y)
-    )
+  # Identify the stem label column for tooltips and fill_coord's id_col
+  tag_col <- intersect(c("Tag No", "New Tag No"), names(data))
+  id_col  <- if (length(tag_col) > 0) tag_col[[1L]] else names(data)[[1L]]
 
-  n_na_x <- sum(is.na(data$X))
-  n_na_y <- sum(is.na(data$Y))
-  if (n_na_x > 0) message(n_na_x, " row(s) with non-numeric or missing X dropped from plot.")
-  if (n_na_y > 0) message(n_na_y, " row(s) with non-numeric or missing Y dropped from plot.")
-  data <- filter(data, !is.na(X), !is.na(Y))
+  # Warn about missing raw coordinates before transformation
+  x_raw <- suppressWarnings(as.numeric(data[["X"]]))
+  y_raw <- suppressWarnings(as.numeric(data[["Y"]]))
+  
+  # Check for subplot-level coordinates mistakenly labelled as plot-level
+  if (coord_scale == "plot") {
+    max_x <- suppressWarnings(max(x_raw, na.rm = TRUE))
+    max_y <- suppressWarnings(max(y_raw, na.rm = TRUE))
+    
+    if (!is.infinite(max_x) && !is.infinite(max_y) &&
+        max_x <= 20 && max_y <= 20) {
+      
+      warning(
+        "Maximum X and Y values are both < 20 while coord_scale = 'plot'. ",
+        "Coordinates may have been recorded at subplot level rather than plot level."
+      )
+    }
+  }
+  
+  n_na  <- sum(is.na(x_raw) | is.na(y_raw))
+  if (n_na > 0) {
+    message(n_na, " stem(s) with missing X and/or Y will appear on the west ",
+            "edge of the plot (x < 0).")
+  }
+
+  # Transform coordinates to plot-level space
+  data <- fill_coord(
+    data        = data,
+    coord_scale = coord_scale,
+    subplot_col = subplot_col,
+    id_col      = id_col,
+    x_col       = "X",
+    y_col       = "Y"
+  )
+
+  # Safety filter: drop any rows still missing plot coordinates after transform
+  # (can occur in rainfor-north when subplot number is outside 1–25)
+  n_still_na <- sum(is.na(data[["x_plot"]]) | is.na(data[["y_plot"]]))
+  if (n_still_na > 0) {
+    message(n_still_na, " stem(s) with unresolvable coordinates removed from plot.")
+    data <- data[!is.na(data[["x_plot"]]) & !is.na(data[["y_plot"]]), ]
+  }
 
   # Order subplot levels numerically where possible, otherwise alphabetically
-  raw_vals <- data[[subplot_col]]
-  num_vals <- suppressWarnings(as.numeric(raw_vals))
+  raw_vals       <- data[[subplot_col]]
+  num_vals       <- suppressWarnings(as.numeric(raw_vals))
   subplot_levels <- if (!anyNA(num_vals[!is.na(raw_vals)])) {
     as.character(sort(unique(num_vals)))
   } else {
@@ -165,28 +233,32 @@ plot_stem_locations <- function(dataset_type,
   }
   data[[subplot_col]] <- factor(data[[subplot_col]], levels = subplot_levels)
 
-  # Tooltip: Tag No when available, otherwise just the excel row
-  tag_col <- intersect(c("Tag No", "New Tag No"), names(data))[1]
-  if (!is.na(tag_col)) {
-    data <- data |> mutate(.label = paste0("Tag: ", .data[[tag_col]],
-                                           "\nRow: ", excel_row))
+  # Tooltip
+  data$.label <- if (!is.na(id_col) && id_col %in% names(data)) {
+    paste0("Tag: ", data[[id_col]], "\nRow: ", data[["excel_row"]])
   } else {
-    data <- data |> mutate(.label = paste0("Row: ", excel_row))
+    paste0("Row: ", data[["excel_row"]])
   }
 
-  # Default axis breaks
-  if (is.null(x_breaks)) x_breaks <- pretty(data$X)
-  if (is.null(y_breaks)) y_breaks <- pretty(data$Y)
+  if (is.null(x_breaks)) x_breaks <- pretty(data[["x_plot"]])
+  if (is.null(y_breaks)) y_breaks <- pretty(data[["y_plot"]])
 
   ggplotly(
-    ggplot(data, aes(x = X, y = Y,
+    ggplot(data, aes(x     = x_plot,
+                     y     = y_plot,
                      color = .data[[subplot_col]],
                      text  = .label)) +
       geom_point() +
       scale_color_manual(values = LOCATION_PALETTE, name = subplot_col) +
       scale_x_continuous(breaks = x_breaks) +
       scale_y_continuous(breaks = y_breaks) +
-      labs(title = paste("Location QC \u2014", subplot_col, "\u2014", dataset_type)),
+      labs(
+        x     = "X (m)",
+        y     = "Y (m)",
+        title = paste0("Location QC \u2014 ", subplot_col,
+                       " \u2014 ", dataset_type,
+                       " [", coord_scale, "]")
+      ),
     tooltip = "text"
   )
 }
