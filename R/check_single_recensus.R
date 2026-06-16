@@ -585,7 +585,9 @@ check_single_recensus <- function(file_path, sheet_name = 1) {
   # Compile and sort
   issues_df <- bind_rows(issues)
   if (nrow(issues_df) > 0) {
-    issues_df <- issues_df |> arrange(excel_row, census, column)
+    issues_df <- issues_df |>
+      select(-census) |>
+      arrange(excel_row, column)
   }
   issues_df
 }
