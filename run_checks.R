@@ -37,6 +37,20 @@
 #   #   "rainfor"       — RAINFOR zig-zag, column-by-column
 #   #   "rainfor-north" — subplot space, always facing north
 #   #   "rainfor-east"  — RAINFOR zig-zag, row-by-row
+#
+#   # Taxonomy validation (requires legacy reference taxonomy file)
+#   tax <- check_taxonomy(
+#     dataset_type = "new_multicensus",
+#     file_path    = "path/to/upload.xlsx",
+#     sheet_name   = "Sheet1",
+#     legacy_path  = "path/to/Taxonomy_reference.csv"
+#   )
+#
+#   tax$issues       # per-issue table
+#   tax$per_species  # one row per species, issue codes collapsed
+#
+#   # Export taxonomy issues to Excel
+#   check_taxonomy(..., export_path = "taxonomy_issues.xlsx")
 # ============================================================
 
 library(readxl)
@@ -51,6 +65,7 @@ source("R/check_new_multicensus.R")
 source("R/check_single_recensus.R")
 source("R/check_new_single_census.R")
 source("R/check_stem_locations.R")
+source("R/check_taxonomy.R")
 
 
 #' Validate a ForestPlots upload Excel file.
