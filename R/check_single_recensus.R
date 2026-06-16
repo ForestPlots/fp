@@ -157,7 +157,7 @@ check_required_front_fields <- function(data) {
   for (col in c("Tag No", "Family", "Species")) {
     if (!col %in% names(data)) next
     bad <- which(is.na(data[[col]]) | trimws(as.character(data[[col]])) == "")
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
       NA, col, paste0(col, " must not be empty"))
   }
   issues
@@ -178,7 +178,7 @@ check_tree_id <- function(data) {
   recruit <- grepl("n", trimws(as.character(data$Flag1)), fixed = TRUE)
   bad     <- which((is.na(tid) | tid == "") & !recruit)
 
-  log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
     NA, "Tree ID",
     "Tree ID must not be empty unless Flag1 contains 'n' (recruit)")
 }
@@ -208,7 +208,7 @@ check_reference_death <- function(data, prev_dead) {
   )
 
   bad <- which(prev_dead & final_has_data)
-  log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
     NA, "Final block",
     paste0("Stem was dead in reference census (F1 = 0) — ",
            "verify this is a back-to-life stem; ",
@@ -234,7 +234,7 @@ check_new_tag_no <- function(data, recruit, tid) {
   is_recruit <- recruit | (is.na(tid) | tid == "")
   bad        <- which(is_recruit & (is.na(new_tag) | new_tag == ""))
 
-  log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
     "New census", "New Tag No",
     "Stem is a recruit (Tree ID blank or Flag1 contains 'n') — New Tag No must be filled")
 }
@@ -254,30 +254,30 @@ check_final_flag1 <- function(data, ref_f1) {
 
   # Flag1 must not be blank
   bad <- which(!has_f1 & ref_f1 == "0")
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
     "New census", "Flag1",
     "Stem was dead in reference census (F1 = 0) — remove this row unless it is a back-to-life stem")
 
   bad <- which(!has_f1 & ref_f1 != "0")
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
     "New census", "Flag1", "Flag1 is blank")
 
   # Valid character set
   bad <- which(has_f1 & !grepl(FLAG1_VALID_CHARS, f1))
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
     "New census", "Flag1",
     "Flag1 contains invalid character(s). Allowed: 0, a\u2013q, s, w\u2013z")
 
   # 'a' may only appear alongside 'n' or 'h'
   bad <- which(has_f1 & grepl("a", f1, fixed = TRUE) & !f1 %in% FLAG1_A_VALID)
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
     "New census", "Flag1",
     "Flag1: 'a' can only be combined with 'n' or 'h' (no other letters)")
 
   # Recruit rule: blank reference F1 means the stem is new — must contain 'n'
   ref_blank <- is.na(ref_f1) | ref_f1 == ""
   bad <- which(ref_blank & has_f1 & f1 != "0" & !grepl("n", f1, fixed = TRUE))
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
     "New census", "Flag1",
     "Reference F1 is empty — Flag1 must contain 'n' for new recruits")
 
@@ -303,18 +303,18 @@ check_final_flag2 <- function(data, ref_f1) {
 
   # Flag2 must not be blank
   bad <- which(f2_blank & ref_f1 == "0")
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
     "New census", "Flag2",
     "Stem was dead in reference census (F1 = 0) — remove this row unless it is a back-to-life stem")
 
   bad <- which(f2_blank & ref_f1 != "0")
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
     "New census", "Flag2", "Flag2 is blank")
 
   # Alive stems must have a valid Flag2 value
   f1_alive <- has_f1 & f1 != "0"
   bad <- which(f1_alive & !is_valid_f2(f2))
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
     "New census", "Flag2",
     paste0("Flag2 is invalid. Must be '1' or at most one character from each group: ",
            "[abcdefghiklm] / [pqr] / [jnostuvwxyz234567]"))
@@ -340,12 +340,12 @@ check_final_flag3_flag4 <- function(data) {
   if ("Flag3" %in% names(data)) {
     f3  <- trimws(as.character(data$Flag3))
     bad <- which(dead_or_blank & !is.na(data$Flag3) & f3 != "")
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
       "New census", "Flag3",
       "Flag3 must be empty when Flag1 is 0 or blank")
 
     bad <- which(alive & !f3 %in% F3_VALID)
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
       "New census", "Flag3",
       paste0("Flag3 invalid value — must be one of: ", paste(F3_VALID, collapse = ", ")))
   }
@@ -353,12 +353,12 @@ check_final_flag3_flag4 <- function(data) {
   if ("Flag4" %in% names(data)) {
     f4  <- trimws(as.character(data$Flag4))
     bad <- which(dead_or_blank & !is.na(data$Flag4) & f4 != "")
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
       "New census", "Flag4",
       "Flag4 must be empty when Flag1 is 0 or blank")
 
     bad <- which(alive & !f4 %in% F4_VALID)
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
       "New census", "Flag4",
       paste0("Flag4 invalid value — must be one of: ", paste(F4_VALID, collapse = ", ")))
   }
@@ -385,30 +385,30 @@ check_final_d_pom <- function(data, ref_f1) {
 
   # Must be numeric
   bad <- which(!is.na(data$D) & d_raw != "" & is.na(d))
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
     "New census", "D",
     "D contains non-numeric characters — must be a number")
 
   bad <- which(!is.na(data$POM) & pom_raw != "" & is.na(pom))
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
     "New census", "POM",
     "POM contains non-numeric characters — must be a number")
 
   # D must not be blank
   d_blank <- is.na(d) & (is.na(data$D) | d_raw == "")
   bad <- which(d_blank & ref_f1 == "0")
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
     "New census", "D",
     "Stem was dead in reference census (F1 = 0) — remove this row unless it is a back-to-life stem")
 
   bad <- which(d_blank & ref_f1 != "0")
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
     "New census", "D", "D is blank")
 
   # Flag1 = 0 (dead) → D and POM must both equal 0
   f1_curr <- trimws(as.character(data$Flag1))
   bad <- which(f1_curr == "0" & !is.na(d) & !is.na(pom) & (d != 0 | pom != 0))
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
     "New census", "D / POM",
     "Flag1 = 0 (dead) — D and POM must both be 0")
 
@@ -432,7 +432,7 @@ check_final_height <- function(data) {
     height_present <- !is.na(data$Height) & height_raw != ""
 
     bad <- which(height_present & is.na(height_num))
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
       "New census", "Height",
       "Height contains non-numeric characters — must be a number")
 
@@ -440,12 +440,12 @@ check_final_height <- function(data) {
     f5_present <- !is.na(data$Flag5) & f5_raw != ""
 
     bad <- which(height_present & (!f5_present | !f5_raw %in% as.character(1:6)))
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
       "New census", "Flag5",
       "Height is filled — Flag5 must be a value from 1 to 6")
 
     bad <- which(!height_present & f5_present)
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
       "New census", "Flag5",
       "Flag5 is filled but Height is empty — Flag5 must be blank when Height is blank")
   }
@@ -454,7 +454,7 @@ check_final_height <- function(data) {
     hba_raw <- trimws(as.character(data$`Height Broken At`))
     hba_num <- suppressWarnings(as.numeric(hba_raw))
     bad <- which(!is.na(data$`Height Broken At`) & hba_raw != "" & is.na(hba_num))
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
       "New census", "Height Broken At",
       "Height Broken At contains non-numeric characters — must be a number")
   }
@@ -478,7 +478,7 @@ check_final_li_ci_cf <- function(data) {
   if ("LI" %in% names(data)) {
     li  <- trimws(as.character(data$LI))
     bad <- which(!is.na(data$LI) & li != "" & !li %in% c("1", "2", "3", "4"))
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
       "New census", "LI",
       "LI invalid value — must be empty or 1, 2, 3, or 4")
   }
@@ -486,7 +486,7 @@ check_final_li_ci_cf <- function(data) {
   if ("CI" %in% names(data)) {
     ci  <- trimws(as.character(data$CI))
     bad <- which(!is.na(data$CI) & ci != "" & !ci %in% CI_VALID)
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
       "New census", "CI",
       paste0("CI invalid value — must be empty or one of: ",
              paste(CI_VALID, collapse = ", ")))
@@ -495,7 +495,7 @@ check_final_li_ci_cf <- function(data) {
   if ("CF" %in% names(data)) {
     cf  <- trimws(as.character(data$CF))
     bad <- which(!is.na(data$CF) & cf != "" & !cf %in% c("0", "1", "2", "3", "4"))
-    issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+    issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
       "New census", "CF",
       "CF invalid value — must be empty or 0, 1, 2, 3, or 4")
   }
@@ -520,12 +520,12 @@ check_pom_change <- function(data, ref_pom) {
   both_present <- !is.na(pom_curr) & !is.na(ref_pom)
 
   bad <- which(both_present & pom_curr != ref_pom & f4 != "60")
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
     "New census", "Flag4",
     "POM changed from reference census — Flag4 must be 60")
 
   bad <- which(both_present & pom_curr == ref_pom & f4 == "60")
-  issues <- log_issue(issues, data$excel_row[bad], data$`Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`Tree ID`[bad],
     "New census", "Flag4",
     "Flag4 = 60 but POM matches reference census — Flag4 should not be 60")
 
