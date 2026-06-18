@@ -596,6 +596,10 @@ check_single_recensus <- function(file_path, sheet_name = 1) {
   # Compile, reorder columns, and sort
   issues_df <- bind_rows(issues)
   if (nrow(issues_df) > 0) {
+    # check_front_columns uses the base log_issue() which lacks TagNo/NewTagNo;
+    # add those columns with NA if they were never populated.
+    if (!"TagNo"    %in% names(issues_df)) issues_df$TagNo    <- NA_character_
+    if (!"NewTagNo" %in% names(issues_df)) issues_df$NewTagNo <- NA_character_
     issues_df <- issues_df |>
       select(excel_row, TreeID, TagNo, NewTagNo, column, issue) |>
       arrange(excel_row, column)
