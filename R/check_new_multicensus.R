@@ -324,6 +324,15 @@ check_flag2 <- function(data, n_censuses) {
       paste0("Census ", c), f2_col,
       paste0("Flag2 is invalid. Must be '1' or at most one character from each group: ",
              "[abcdefghiklm] / [pqr] / [jnostuvwxyz234567] (Census ", c, ")"))
+
+    # Dead stems (Flag1 = 0): when Flag2 is filled it must still follow the group rules
+    f1_zero  <- !f1_na & f1 == "0"
+    f2_blank <- is.na(data[[f2_col]]) | f2 == ""
+    bad <- which(f1_zero & !f2_blank & !is_valid_f2(f2))
+    issues <- log_issue(issues, data$excel_row[bad], data$TreeID[bad],
+      paste0("Census ", c), f2_col,
+      paste0("Flag2 is invalid — at most one character from each group is allowed: ",
+             "[abcdefghiklm] / [pqr] / [jnostuvwxyz234567] (Census ", c, ")"))
   }
 
   issues

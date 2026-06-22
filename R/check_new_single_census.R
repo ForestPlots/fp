@@ -201,9 +201,18 @@ check_flag2_sc <- function(data) {
   f1_alive <- has_f1 & f1 != "0"
 
   bad <- which(f1_alive & !is_valid_f2(f2))
-  log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
+  issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
     NA, "Flag2",
     paste0("Flag2 is invalid \u2014 must be '1' alone or at most one character from each group: ",
+           "[abcdefghiklm] / [pqr] / [jnostuvwxyz234567]"))
+
+  # Dead stems (Flag1 = 0): when Flag2 is filled it must still follow the group rules
+  f1_zero  <- has_f1 & f1 == "0"
+  f2_blank <- is_empty(data$Flag2)
+  bad <- which(f1_zero & !f2_blank & !is_valid_f2(f2))
+  log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
+    NA, "Flag2",
+    paste0("Flag2 is invalid \u2014 at most one character from each group is allowed: ",
            "[abcdefghiklm] / [pqr] / [jnostuvwxyz234567]"))
 }
 

@@ -353,6 +353,13 @@ check_final_flag2 <- function(data, ref_f1) {
     paste0("Flag2 is invalid. Must be '1' or at most one character from each group: ",
            "[abcdefghiklm] / [pqr] / [jnostuvwxyz234567]"))
 
+  # Dead stems (Flag1 = 0): when Flag2 is filled it must still follow the group rules
+  f1_zero <- has_f1 & f1 == "0"
+  bad <- which(f1_zero & !f2_blank & !is_valid_f2(f2))
+  issues <- log_issue_sr(issues, data, bad, "New census", "Flag2",
+    paste0("Flag2 is invalid — at most one character from each group is allowed: ",
+           "[abcdefghiklm] / [pqr] / [jnostuvwxyz234567]"))
+
   issues
 }
 
@@ -398,7 +405,7 @@ check_final_flag3_flag4 <- function(data) {
 
 #' Check D and POM rules for the final census block.
 #'
-#' Checks: D and POM must be numeric; D must not be blank; when Flag1 = 0
+#' Checks: D and POM must be numeric; D and POM must not be blank; when Flag1 = 0
 #' (dead), both D and POM must equal 0.
 #'
 #' @param data   Parsed data frame.
@@ -430,6 +437,15 @@ check_final_d_pom <- function(data, ref_f1) {
 
   bad <- which(d_blank & ref_f1 != "0")
   issues <- log_issue_sr(issues, data, bad, "New census", "D", "D is blank")
+
+  # POM must not be blank
+  pom_blank <- is.na(pom) & (is.na(data$POM) | pom_raw == "")
+  bad <- which(pom_blank & ref_f1 == "0")
+  issues <- log_issue_sr(issues, data, bad, "New census", "POM",
+    "Stem was dead in reference census (F1 = 0) — remove this row unless it is a back-to-life stem")
+
+  bad <- which(pom_blank & ref_f1 != "0")
+  issues <- log_issue_sr(issues, data, bad, "New census", "POM", "POM is blank")
 
   # Flag1 = 0 (dead) → D and POM must both equal 0
   f1_curr <- trimws(as.character(data$Flag1))
