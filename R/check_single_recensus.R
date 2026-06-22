@@ -279,7 +279,7 @@ check_new_tag_no <- function(data, recruit, tid) {
 #' Check Flag1 rules for the final census block.
 #'
 #' Checks: not blank, valid character set, 'a' combination rule,
-#' recruit 'n' rule when reference F1 was absent.
+#' 'n'/'h' must not appear alone, recruit 'n' rule when reference F1 was absent.
 #'
 #' @param data   Parsed data frame.
 #' @param ref_f1 Character vector of trimmed reference-census F1 values.
@@ -306,6 +306,11 @@ check_final_flag1 <- function(data, ref_f1) {
   bad <- which(has_f1 & grepl("a", f1, fixed = TRUE) & !f1 %in% FLAG1_A_VALID)
   issues <- log_issue_sr(issues, data, bad, "New census", "Flag1",
     "Flag1: 'a' can only be combined with 'n' or 'h' (no other letters)")
+
+  # 'n' and/or 'h' must be accompanied by at least one other valid character
+  bad <- which(has_f1 & grepl("^[nh]+$", f1))
+  issues <- log_issue_sr(issues, data, bad, "New census", "Flag1",
+    "Flag1: 'n' and/or 'h' cannot appear alone — must be accompanied by another valid character")
 
   # Recruit rule: blank reference F1 means the stem is new — must contain 'n'
   ref_blank <- is.na(ref_f1) | ref_f1 == ""

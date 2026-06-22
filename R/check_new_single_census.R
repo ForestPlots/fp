@@ -178,6 +178,12 @@ check_flag1_sc <- function(data) {
     NA, "Flag1",
     "Flag1: 'a' may only be combined with 'n' and/or 'h'")
 
+  # 'n' and/or 'h' must be accompanied by at least one other valid character
+  bad <- which(has_f1 & grepl("^[nh]+$", f1))
+  issues <- log_issue(issues, data$excel_row[bad], data$`New Tag No`[bad],
+    NA, "Flag1",
+    "Flag1: 'n' and/or 'h' cannot appear alone \u2014 must be accompanied by another valid character")
+
   issues
 }
 

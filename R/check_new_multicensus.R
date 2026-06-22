@@ -275,6 +275,12 @@ check_flag1 <- function(data, n_censuses) {
       paste0("Census ", c), f1_col,
       paste0("Flag1: 'a' can only be combined with 'n' or 'h' (no other letters) (Census ", c, ")"))
 
+    # 'n' and/or 'h' must be accompanied by at least one other valid character
+    bad <- which(has_value & grepl("^[nh]+$", f1))
+    issues <- log_issue(issues, data$excel_row[bad], data$TreeID[bad],
+      paste0("Census ", c), f1_col,
+      paste0("Flag1: 'n' and/or 'h' cannot appear alone \u2014 must be accompanied by another valid character (Census ", c, ")"))
+
     if (c > 1) {
       f1_prev     <- trimws(as.character(data[[paste0("Flag1_c", c - 1)]]))
       prev_blank  <- is.na(data[[paste0("Flag1_c", c - 1)]]) | f1_prev == ""
